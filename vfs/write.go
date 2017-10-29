@@ -85,13 +85,13 @@ func (fh *WriteFileHandle) WriteAt(p []byte, off int64) (n int, err error) {
 	// fs.Debugf(fh.remote, "WriteFileHandle.Write len=%d", len(p))
 	fh.mu.Lock()
 	defer fh.mu.Unlock()
-	if fh.offset != off {
-		fs.Errorf(fh.remote, "WriteFileHandle.Write can't seek in file")
-		return 0, ESPIPE
-	}
 	if fh.closed {
 		fs.Errorf(fh.remote, "WriteFileHandle.Write error: %v", EBADF)
 		return 0, EBADF
+	}
+	if fh.offset != off {
+		fs.Errorf(fh.remote, "WriteFileHandle.Write can't seek in file")
+		return 0, ESPIPE
 	}
 	fh.writeCalled = true
 	n, err = fh.pipeWriter.Write(p)
@@ -141,6 +141,13 @@ func (fh *WriteFileHandle) close() error {
 	return err
 }
 
+// Close closes the file
+func (fh *WriteFileHandle) Close() error {
+	fh.mu.Lock()
+	defer fh.mu.Unlock()
+	return fh.close()
+}
+
 // Flush is called on each close() of a file descriptor. So if a
 // filesystem wants to return write errors in close() and the file has
 // cached dirty data, this is a good place to write back data and
@@ -159,6 +166,10 @@ func (fh *WriteFileHandle) close() error {
 func (fh *WriteFileHandle) Flush() error {
 	fh.mu.Lock()
 	defer fh.mu.Unlock()
+	if fh.closed {
+		fs.Debugf(fh.remote, "WriteFileHandle.Flush nothing to do")
+		return nil
+	}
 	// fs.Debugf(fh.remote, "WriteFileHandle.Flush")
 	// If Write hasn't been called then ignore the Flush - Release
 	// will pick it up
@@ -200,14 +211,4 @@ func (fh *WriteFileHandle) Release() error {
 // Stat returns info about the file
 func (fh *WriteFileHandle) Stat() (os.FileInfo, error) {
 	return fh.file, nil
-}
-
-// Close closes the file calling Flush then Release
-func (fh *WriteFileHandle) Close() error {
-	err := fh.Flush()
-	err2 := fh.Release()
-	if err != nil {
-		return err
-	}
-	return err2
 }
