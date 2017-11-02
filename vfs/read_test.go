@@ -113,6 +113,11 @@ func TestReadFileHandleSeek(t *testing.T) {
 	l, err := fh.Read(buf)
 	assert.Equal(t, io.EOF, err)
 	assert.Equal(t, 0, l)
+
+	// Check if noSeek is set we get an error
+	fh.noSeek = true
+	_, err = fh.Seek(0, 0)
+	assert.Equal(t, ESPIPE, err)
 }
 
 func TestReadFileHandleReadAt(t *testing.T) {
