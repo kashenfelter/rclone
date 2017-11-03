@@ -17,6 +17,7 @@ import (
 
 	"github.com/ncw/rclone/fs"
 	"github.com/pkg/errors"
+	"golang.org/x/text/unicode/norm"
 	"google.golang.org/appengine/log"
 )
 
@@ -841,6 +842,12 @@ func (f *Fs) cleanPath(s string) string {
 		}
 		s = cleanWindowsName(f, s)
 	} else {
+		// OS X uses NFD encoding to store files and actively
+		// changes files to that encoding, so we change
+		// encoding to NFD here.
+		if runtime.GOOS == "darwin" {
+			s = norm.NFD.String(s)
+		}
 		if !filepath.IsAbs(s) {
 			s2, err := filepath.Abs(s)
 			if err == nil {
